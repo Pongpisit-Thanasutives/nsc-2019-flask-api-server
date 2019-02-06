@@ -1,11 +1,39 @@
+import gzip
+import os
 from os import listdir
 import pickle
-import numpy as np
-from sklearn.cluster import KMeans
 
 from flask import Flask
-from flask import request, jsonify, send_file
+from flask import request, jsonify, send_file, redirect
+from werkzeug.utils import secure_filename
+
 app = Flask(__name__)
+UPLOAD_FOLDER = '/uploads'
+ALLOWED_EXTENSIONS = set(['png', 'jpg', 'jpeg'])
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+import h5py
+import scipy.io as io
+import PIL.Image as Image
+import numpy as np
+import os
+import glob
+from matplotlib import pyplot as plt
+from scipy.ndimage.filters import gaussian_filter 
+import scipy
+import json
+import torchvision.transforms.functional as F
+from matplotlib import cm as CM
+from model import CSRNet
+import torch
+
+from torchvision import datasets, transforms
+from torchvision import datasets, transforms
+transform=transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
+model = CSRNet()
+model = model.cuda()
+checkpoint = torch.load('model_best.pth.tar')
+model.load_state_dict(checkpoint['state_dict'])
 
 def read_pickle(filename):
     with open(filename, 'rb') as f:
@@ -15,11 +43,8 @@ def read_pickle(filename):
         return p
 
 all_pictures = sorted(listdir('./demo_pics'))
-
 imgname2pred = dict(read_pickle('./demo_count_predictions.pkl'))
-preds = np.array(list(imgname2pred.values())).reshape(len(imgname2pred), 1)
-kmeans = KMeans(n_clusters=3, random_state=0).fit(preds)
-to_class = {2:'Low', 0:'Medium', 1:'High'}
+# all_pictures = sorted(imgname2pred.keys())
 
 def bSearch(item):
     global all_pictures
@@ -48,13 +73,11 @@ def getNowPicture():
 
 @app.route("/getFivePoints", methods=['GET'])
 def getFivePoints():
-    global kmeans, to_class
     startTime = request.args.get('startTime')
     img_idx = bSearch(startTime)[1]
     imgname2pred5points = {}
     for i in range(5):
-        num_heads = int(imgname2pred[all_pictures[img_idx + i]])
-        imgname2pred5points[all_pictures[img_idx + i]] = num_heads, to_class[kmeans.predict([[num_heads]])[0]]
+        imgname2pred5points[all_pictures[img_idx + i]] = int(imgname2pred[all_pictures[img_idx + i]])
     return jsonify(imgname2pred5points)
 
 @app.route("/getHeatMap", methods=['GET'])
@@ -63,4 +86,19 @@ def getHeatMap():
     img_name = bSearch(time)[0]
     return send_file('./heatgen/' + 'gh_'+img_name)
 
-app.run(debug=True)
+@app.route("/uploadImage", methods=['POST'])
+def uploadFile():
+    if 'file' not in request.files:
+        return redirect(request.url)
+    file = request.files['file']
+
+    if file.filename == '':
+        return redirect(request.url)
+    if file:
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], 'now.jpg'))
+        img = transform(Image.open(UPLOAD_FOLDER + '/now.jpg').convert('RGB')).cuda()
+        est = model(img.unsqueeze(0))
+        pred = est.detach().cpu().numpy()
+        return pred
+        
+app.run()
