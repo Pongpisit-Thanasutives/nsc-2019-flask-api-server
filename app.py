@@ -1,6 +1,7 @@
 import gzip
 import os
 from os import listdir
+import sys
 import pickle
 
 from flask import Flask
@@ -24,20 +25,22 @@ import scipy
 import json
 import torchvision.transforms.functional as F
 from matplotlib import cm as CM
+
 from model import CSRNet
 import torch
-
 from torchvision import datasets, transforms
 from torchvision import datasets, transforms
 transform=transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
 model = CSRNet()
-model = model.cuda()
 checkpoint = torch.load('model_best.pth.tar')
 model.load_state_dict(checkpoint['state_dict'])
 
 def read_pickle(filename):
     with open(filename, 'rb') as f:
-        u = pickle._Unpickler(f)
+        if sys.version_info[0] > 2:
+            u = pickle._Unpickler(f)
+        else:
+            u = pickle.Unpickler(f)
         u.encoding = 'latin1'
         p = u.load()
         return p
@@ -87,18 +90,17 @@ def getHeatMap():
     return send_file('./heatgen/' + 'gh_'+img_name)
 
 @app.route("/uploadImage", methods=['POST'])
-def uploadFile():
-    if 'file' not in request.files:
-        return redirect(request.url)
+def uploadImage():
+    print("Uploading an image")
     file = request.files['file']
 
-    if file.filename == '':
-        return redirect(request.url)
     if file:
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], 'now.jpg'))
-        img = transform(Image.open(UPLOAD_FOLDER + '/now.jpg').convert('RGB')).cuda()
+        filename = secure_filename(file.filename)
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        img = transform(Image.open(UPLOAD_FOLDER + '/' + filename).convert('RGB'))
         est = model(img.unsqueeze(0))
         pred = est.detach().cpu().numpy()
-        return pred
-        
+        out = jsonify({'density_map':pred, 'count':np.sum(pred)})
+        return out
+
 app.run()
