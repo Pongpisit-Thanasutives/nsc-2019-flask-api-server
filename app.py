@@ -9,7 +9,7 @@ from flask import request, jsonify, send_file, redirect
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-UPLOAD_FOLDER = '/uploads'
+UPLOAD_FOLDER = './uploads'
 ALLOWED_EXTENSIONS = set(['png', 'jpg', 'jpeg'])
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
@@ -97,10 +97,36 @@ def uploadImage():
     if file:
         filename = secure_filename(file.filename)
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-        img = transform(Image.open(UPLOAD_FOLDER + '/' + filename).convert('RGB'))
+        base_img_path = UPLOAD_FOLDER + '/' + filename
+        img = transform(Image.open(base_img_path).convert('RGB'))
         est = model(img.unsqueeze(0))
         pred = est.detach().cpu().numpy()
-        out = jsonify({'density_map':pred, 'count':np.sum(pred)})
-        return out
+        print(pred.shape)
+
+        out = jsonify({'count':np.sum(pred)})
+        pred = pred.reshape(96, 128)
+        heatmap(pred, base_img_path, 8, UPLOAD_FOLDER + '/heatmap/' + filename)
+        
+        return out, send_file(UPLOAD_FOLDER + '/heatmap/' + filename)
+
+def heatmap(den, base_img_path, n, save_path):
+    print('generating heatmap for ' + base_img_path)
+    
+    den_resized = np.zeros((den.shape[0] * n, den.shape[1] * n))
+    for i in range(den_resized.shape[0]):
+        for j in range(den_resized.shape[1]):
+            den_resized[i][j] = den[int(i / n)][int(j / n)] / (n ** 2)
+    den = den_resized
+    
+    count = np.sum(den)
+    den = den * 10 / np.max(den)
+     
+    data = []
+    for j in range(len(den)):
+        for i in range(len(den[0])):
+            for k in range(int(den[j][i])):
+                data.append([i + 1, j + 1])
+    hm = HeatMap(data, base = base_img_path)
+    hm.heatmap(save_as=save_path)
 
 app.run()
