@@ -10,6 +10,7 @@ from flask import Flask
 from flask import request, jsonify, send_file, redirect
 from werkzeug.utils import secure_filename
 from sklearn.cluster import KMeans
+import time
 
 
 app = Flask(__name__)
