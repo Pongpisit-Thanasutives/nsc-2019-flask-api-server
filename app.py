@@ -3,11 +3,14 @@ import os
 from os import listdir
 import sys
 import pickle
+import numpy as np
 from pyheatmap.heatmap import HeatMap
 
 from flask import Flask
 from flask import request, jsonify, send_file, redirect
 from werkzeug.utils import secure_filename
+from sklearn.cluster import KMeans
+
 
 app = Flask(__name__)
 UPLOAD_FOLDER = './uploads'
@@ -50,6 +53,9 @@ def read_pickle(filename):
 all_pictures = sorted(listdir('./demo_pics'))
 imgname2pred = dict(read_pickle('./demo_count_predictions.pkl'))
 # all_pictures = sorted(imgname2pred.keys())
+preds = np.array(list(imgname2pred.values())).reshape(len(imgname2pred), 1)
+kmeans = KMeans(n_clusters=3,random_state=0).fit(preds)
+to_class = {2: 'Low', 0: 'Medium', 1: 'High'}
 
 def bSearch(item):
     global all_pictures
@@ -78,11 +84,16 @@ def getNowPicture():
 
 @app.route("/getFivePoints", methods=['GET'])
 def getFivePoints():
+    global kmeans,to_class
     startTime = request.args.get('startTime')
+    # I added this because at first we don't have any picture prior to 11 AM
+    # This should be edited later
+    startTime = "11" + startTime[2:]
     img_idx = bSearch(startTime)[1]
     imgname2pred5points = {}
     for i in range(5):
-        imgname2pred5points[all_pictures[img_idx + i]] = int(imgname2pred[all_pictures[img_idx + i]])
+        num_heads = int(imgname2pred[all_pictures[img_idx + i]])
+        imgname2pred5points[all_pictures[img_idx + i]] = int(imgname2pred[all_pictures[img_idx + i]]) , to_class[kmeans.predict([[num_heads]])[0]]
     return jsonify(imgname2pred5points)
 
 @app.route("/getHeatMap", methods=['GET'])
@@ -140,4 +151,4 @@ def heatmap(den, base_img_path, n, save_path):
     hm.heatmap(save_as=save_path)
     print('done generating heatmap')
 
-app.run()
+app.run(host='0.0.0.0')
