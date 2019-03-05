@@ -3,6 +3,7 @@ import os
 from os import listdir
 import sys
 import pickle
+from pyheatmap.heatmap import HeatMap
 
 from flask import Flask
 from flask import request, jsonify, send_file, redirect
@@ -29,11 +30,12 @@ from matplotlib import cm as CM
 from model import CSRNet
 import torch
 from torchvision import datasets, transforms
-from torchvision import datasets, transforms
 transform=transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
 model = CSRNet()
-checkpoint = torch.load('model_best.pth.tar')
+checkpoint = torch.load('model_best.pth.tar', map_location=lambda storage, loc: storage)
 model.load_state_dict(checkpoint['state_dict'])
+
+headcounts = {}
 
 def read_pickle(filename):
     with open(filename, 'rb') as f:
@@ -91,6 +93,7 @@ def getHeatMap():
 
 @app.route("/uploadImage", methods=['POST'])
 def uploadImage():
+    global headcounts
     print("Uploading an image")
     file = request.files['file']
 
@@ -101,13 +104,20 @@ def uploadImage():
         img = transform(Image.open(base_img_path).convert('RGB'))
         est = model(img.unsqueeze(0))
         pred = est.detach().cpu().numpy()
-        print(pred.shape)
 
-        out = jsonify({'count':np.sum(pred)})
-        pred = pred.reshape(96, 128)
-        heatmap(pred, base_img_path, 8, UPLOAD_FOLDER + '/heatmap/' + filename)
-        
-        return out, send_file(UPLOAD_FOLDER + '/heatmap/' + filename)
+        count = int(np.sum(pred))
+        out = jsonify({'count':count})
+        pred = pred.reshape(pred.shape[2], pred.shape[3])
+        headcounts[filename] = count
+        print(headcounts)
+        heatmap(pred, base_img_path, 8, UPLOAD_FOLDER + '/heatmap/' + str(count) + '_' + filename)
+        return send_file(UPLOAD_FOLDER + '/heatmap/' + str(count) + '_' + filename)
+
+@app.route("/getHeadcounts", methods=['GET'])
+def getHeadcounts():
+    global headcounts
+    uploaded_filename = request.args.get('uploaded_filename')
+    return jsonify({'count':headcounts[uploaded_filename]})
 
 def heatmap(den, base_img_path, n, save_path):
     print('generating heatmap for ' + base_img_path)
@@ -128,5 +138,6 @@ def heatmap(den, base_img_path, n, save_path):
                 data.append([i + 1, j + 1])
     hm = HeatMap(data, base = base_img_path)
     hm.heatmap(save_as=save_path)
+    print('done generating heatmap')
 
 app.run()

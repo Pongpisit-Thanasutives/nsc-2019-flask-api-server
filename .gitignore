@@ -1,2 +1,8 @@
 /demo_pics/*
 /heatgen/*
+/heatgen
+/uploads
+/demo_pics
+*.pyc
+*.tar
+.DS_Store
