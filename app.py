@@ -111,6 +111,10 @@ def uploadImage():
 
     if file:
         filename = secure_filename(file.filename)
+        now = time.time()
+        future = now + 60
+        year, month, day, hour, minute = time.strftime("%Y,%m,%d,%H,%M", time.localtime(int(future))).split(',')
+        filename = str(hour) + str(minute) + ".jpg"
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
         base_img_path = UPLOAD_FOLDER + '/' + filename
         img = transform(Image.open(base_img_path).convert('RGB'))
