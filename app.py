@@ -40,6 +40,7 @@ checkpoint = torch.load('model_best.pth.tar', map_location=lambda storage, loc: 
 model.load_state_dict(checkpoint['state_dict'])
 
 headcounts = {}
+uploaded_images = []
 
 def read_pickle(filename):
     with open(filename, 'rb') as f:
@@ -54,9 +55,9 @@ def read_pickle(filename):
 all_pictures = sorted(listdir('./demo_pics'))
 imgname2pred = dict(read_pickle('./demo_count_predictions.pkl'))
 # all_pictures = sorted(imgname2pred.keys())
-preds = np.array(list(imgname2pred.values())).reshape(len(imgname2pred), 1)
+preds = np.array(sorted(list(imgname2pred.values()))).reshape(len(imgname2pred), 1)
 kmeans = KMeans(n_clusters=3,random_state=0).fit(preds)
-to_class = {2: 'Low', 0: 'Medium', 1: 'High'}
+to_class = ['Medium', 'High', 'Low']
 
 def bSearch(item):
     global all_pictures
@@ -79,29 +80,47 @@ def home():
 
 @app.route("/getNowPicture", methods=['GET'])
 def getNowPicture():
-    time = request.args.get('time')
+    time = str(request.args.get('time'))
     img_name = bSearch(time)[0]
-    return send_file('./demo_pics/' + img_name)
+    # Option 1: For mocking purpose
+    # return send_file('./demo_pics/' + img_name)
+    # Option 2: For demo purpose
+    return send_file('uploads/' + img_name)
 
 @app.route("/getFivePoints", methods=['GET'])
 def getFivePoints():
-    global kmeans,to_class
-    startTime = request.args.get('startTime')
+    global kmeans,to_class,headcounts,uploaded_images
+    startTime = str(request.args.get('startTime'))
     # I added this because at first we don't have any picture prior to 11 AM
     # This should be edited later
-    startTime = "11" + startTime[2:]
+    # startTime = "11" + startTime[2:]
     img_idx = bSearch(startTime)[1]
     imgname2pred5points = {}
-    for i in range(5):
-        num_heads = int(imgname2pred[all_pictures[img_idx + i]])
-        imgname2pred5points[all_pictures[img_idx + i]] = int(imgname2pred[all_pictures[img_idx + i]]) , to_class[kmeans.predict([[num_heads]])[0]]
-    return jsonify(imgname2pred5points)
+    last_five_images = uploaded_images[-5:]
+    # Option 1: For mocking purpose
+    # for i in range(5):
+    #     num_heads = int(imgname2pred[all_pictures[img_idx + i]])
+    #     imgname2pred5points[all_pictures[img_idx + i]] = int(imgname2pred[all_pictures[img_idx + i]]) , to_class[kmeans.predict([[num_heads]])[0]]
+    # Option 2: For demo purpose
+    # print("testtttt222")
+    # print(headcounts[startTime])
+    # print("testtttt222")
+    if len(last_five_images) == 0:
+        return 'No uploaded images'
+    else:
+        for e in last_five_images:
+            num_heads = int(headcounts[e])
+            imgname2pred5points[e] = int(headcounts[e]) , to_class[kmeans.predict([[num_heads]])[0]]
+        return jsonify(imgname2pred5points)
 
 @app.route("/getHeatMap", methods=['GET'])
 def getHeatMap():
-    time = request.args.get('time')
+    time = str(request.args.get('time'))
     img_name = bSearch(time)[0]
-    return send_file('./heatgen/' + 'gh_'+img_name)
+    # Option 1: Mocking purpose
+    # return send_file('./heatgen/' + 'gh_'+img_name)
+    # Option 2: Demo purpose
+    return send_file('uploads/heatmap/' + img_name)
 
 @app.route("/uploadImage", methods=['POST'])
 def uploadImage():
@@ -125,14 +144,17 @@ def uploadImage():
         out = jsonify({'count':count})
         pred = pred.reshape(pred.shape[2], pred.shape[3])
         headcounts[filename] = count
+        uploaded_images.append(filename)
         print(headcounts)
-        heatmap(pred, base_img_path, 8, UPLOAD_FOLDER + '/heatmap/' + str(count) + '_' + filename)
-        return send_file(UPLOAD_FOLDER + '/heatmap/' + str(count) + '_' + filename)
+        heatmap(pred, base_img_path, 8, UPLOAD_FOLDER + '/heatmap/' + filename)
+        return send_file(UPLOAD_FOLDER + '/heatmap/'  + filename)
 
 @app.route("/getHeadcounts", methods=['GET'])
 def getHeadcounts():
     global headcounts
-    uploaded_filename = request.args.get('uploaded_filename')
+    uploaded_filename = str(request.args.get('uploaded_filename'))
+    print("testt2333333")
+    print(headcounts[uploaded_filename])
     return jsonify({'count':headcounts[uploaded_filename]})
 
 def heatmap(den, base_img_path, n, save_path):
