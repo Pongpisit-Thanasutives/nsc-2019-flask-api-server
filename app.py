@@ -59,6 +59,10 @@ preds = np.array(sorted(list(imgname2pred.values()))).reshape(len(imgname2pred),
 kmeans = KMeans(n_clusters=3,random_state=0).fit(preds)
 to_class = ['Medium', 'High', 'Low']
 
+# Set up directories for uploading
+if not os.path.exists('./uploads/heatgen'):
+    os.makedirs('./uploads/heatgen')
+
 def bSearch(item):
     global all_pictures
     first = 0; last = len(all_pictures)-1; found = False
@@ -94,7 +98,7 @@ def getFivePoints():
     # I added this because at first we don't have any picture prior to 11 AM
     # This should be edited later
     # startTime = "11" + startTime[2:]
-    img_idx = bSearch(startTime)[1]
+    # img_idx = bSearch(startTime)[1]
     imgname2pred5points = {}
     last_five_images = uploaded_images[-5:]
     # Option 1: For mocking purpose
@@ -141,7 +145,6 @@ def uploadImage():
         pred = est.detach().cpu().numpy()
 
         count = int(np.sum(pred))
-        out = jsonify({'count':count})
         pred = pred.reshape(pred.shape[2], pred.shape[3])
         headcounts[filename] = count
         uploaded_images.append(filename)
@@ -165,8 +168,6 @@ def heatmap(den, base_img_path, n, save_path):
         for j in range(den_resized.shape[1]):
             den_resized[i][j] = den[int(i / n)][int(j / n)] / (n ** 2)
     den = den_resized
-    
-    count = np.sum(den)
     den = den * 10 / np.max(den)
      
     data = []
