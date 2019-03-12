@@ -158,8 +158,8 @@ def uploadImage():
 @app.route("/getHeadcounts", methods=['GET'])
 def getHeadcounts():
     global headcounts, uploaded_images
-    # uploaded_filename = str(request.args.get('uploaded_filename'))
-    uploaded_filename = str(uploaded_images[-1])
+    uploaded_filename = str(request.args.get('uploaded_filename'))
+    # uploaded_filename = str(uploaded_images[-1])
     print(headcounts[uploaded_filename])
     return jsonify({'count':headcounts[uploaded_filename][0], 'density':headcounts[uploaded_filename][1]})
 
