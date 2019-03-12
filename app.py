@@ -128,7 +128,7 @@ def getHeatMap():
 
 @app.route("/uploadImage", methods=['POST'])
 def uploadImage():
-    global headcounts
+    global kmeans,to_class,headcounts
     print("Uploading an image")
     file = request.files['file']
 
@@ -146,9 +146,12 @@ def uploadImage():
 
         count = int(np.sum(pred))
         pred = pred.reshape(pred.shape[2], pred.shape[3])
-        headcounts[filename] = count
+
+        headcounts[filename] = count, to_class[kmeans.predict([[count]])[0]]
         uploaded_images.append(filename)
+        
         print(headcounts)
+        
         heatmap(pred, base_img_path, 8, UPLOAD_FOLDER + '/heatmap/' + filename)
         return send_file(UPLOAD_FOLDER + '/heatmap/'  + filename)
 
@@ -158,7 +161,7 @@ def getHeadcounts():
     uploaded_filename = str(request.args.get('uploaded_filename'))
     print("testt2333333")
     print(headcounts[uploaded_filename])
-    return jsonify({'count':headcounts[uploaded_filename]})
+    return jsonify({'count':headcounts[uploaded_filename][0], 'density':headcounts[uploaded_filename][1]})
 
 def heatmap(den, base_img_path, n, save_path):
     print('generating heatmap for ' + base_img_path)
