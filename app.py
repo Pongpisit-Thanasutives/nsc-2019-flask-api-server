@@ -113,8 +113,8 @@ def getFivePoints():
         return 'No uploaded images'
     else:
         for e in last_five_images:
-            num_heads = int(headcounts[e])
-            imgname2pred5points[e] = int(headcounts[e]) , to_class[kmeans.predict([[num_heads]])[0]]
+            num_heads = int(headcounts[e][0])
+            imgname2pred5points[e] = int(headcounts[e][0]) , headcounts[e][1]
         return jsonify(imgname2pred5points)
 
 @app.route("/getHeatMap", methods=['GET'])
