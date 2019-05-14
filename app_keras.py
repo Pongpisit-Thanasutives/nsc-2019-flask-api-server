@@ -24,7 +24,7 @@ import scipy
 import json
 from matplotlib import cm as CM
 
-from keras.models import load_model_json
+from keras.models import model_from_json
 from keras_applications.resnet import preprocess_input as k_preprocess_input
 from keras.preprocessing import image as k_image
 
