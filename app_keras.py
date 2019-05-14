@@ -11,7 +11,7 @@ from flask import request, jsonify, send_file, redirect
 from werkzeug.utils import secure_filename
 from sklearn.cluster import KMeans
 import time
-
+# /home/pongpisit/anaconda3/lib/python3.6/site-packages/keras_applications/__init__.py
 import h5py
 import scipy.io as io
 import PIL.Image as Image
@@ -24,6 +24,7 @@ import scipy
 import json
 from matplotlib import cm as CM
 
+from keras.models import loaded_model_json
 from keras_applications.resnet import preprocess_input as k_preprocess_input
 from keras.preprocessing import image as k_image
 
