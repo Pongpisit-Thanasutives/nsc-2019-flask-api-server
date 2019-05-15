@@ -10,8 +10,10 @@ from flask import Flask
 from flask import request, jsonify, send_file, redirect
 from werkzeug.utils import secure_filename
 from sklearn.cluster import KMeans
+
 import time
-# /home/pongpisit/anaconda3/lib/python3.6/site-packages/keras_applications/__init__.py
+import glob
+
 import h5py
 import scipy.io as io
 import PIL.Image as Image
@@ -68,10 +70,12 @@ kmeans = KMeans(n_clusters=3,random_state=0).fit(preds)
 to_class = ['Medium', 'High', 'Low']
 
 model = load_model('models/Res50.json', 'weights/Res50.h5')
+model._make_predict_function()
 
 # Set up directories for uploading
-if not os.path.exists('./uploads/heatgen'):
-    os.makedirs('./uploads/heatgen')
+if not os.path.exists('./uploads/heatmap'):
+    os.makedirs('./uploads/heatmap')
+all_pictures = [e for e in os.listdir('./uploads') if '.jpg' in e]
 
 def bSearch(item):
     global all_pictures
@@ -94,9 +98,12 @@ def home():
 
 @app.route("/getNowPicture", methods=['GET'])
 def getNowPicture():
-    time = str(request.args.get('time'))
-    img_name = bSearch(time)[0]
-    return send_file('uploads/' + img_name)
+    # time = str(request.args.get('time'))
+    # img_name = bSearch(time)[0]
+    list_of_files = [e for e in glob.glob('./uploads/*') if os.path.isfile(e)]
+    img_name = max(list_of_files, key=os.path.getctime)
+    print(img_name)
+    return send_file(img_name)
 
 @app.route("/getFivePoints", methods=['GET'])
 def getFivePoints():
@@ -114,13 +121,20 @@ def getFivePoints():
 
 @app.route("/getHeatMap", methods=['GET'])
 def getHeatMap():
-    time = str(request.args.get('time'))
-    img_name = bSearch(time)[0]
-    return send_file('uploads/heatmap/' + img_name)
+    # time = str(request.args.get('time'))
+    # img_name = bSearch(time)[0]
+    list_of_files = [e for e in glob.glob('./uploads/*') if os.path.isfile(e)]
+    img_name = max(list_of_files, key=os.path.getctime)
+    return send_file('./uploads/' + img_name.replace('./uploads', 'heatmap'))
+
+def concatTime(a, b):
+    res = str(int(a) + int(b))
+    if len(res) == 2: return res
+    else: return '0' + res
 
 @app.route("/uploadImage", methods=['POST'])
 def uploadImage():
-    global kmeans,to_class,headcounts
+    global kmeans, to_class, headcounts, model
     print("Uploading an image")
     file = request.files['file']
 
@@ -129,7 +143,7 @@ def uploadImage():
         now = time.time()
         future = now + 60
         year, month, day, hour, minute = time.strftime("%Y,%m,%d,%H,%M", time.localtime(int(future))).split(',')
-        filename = str(hour) + str(minute) + ".jpg"
+        filename = concatTime(hour, 7) + str(minute) + ".jpg"
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
         base_img_path = UPLOAD_FOLDER + '/' + filename
 
@@ -137,7 +151,7 @@ def uploadImage():
         pred = model.predict(create_img(base_img_path))
 
         count = int(np.sum(pred))
-        pred = pred.reshape(pred.shape[2], pred.shape[3])
+        pred = np.squeeze(pred)
 
         headcounts[filename] = count, to_class[kmeans.predict([[count]])[0]]
         uploaded_images.append(filename)
@@ -152,9 +166,11 @@ def getHeadcounts():
     global headcounts, uploaded_images
     uploaded_filename = str(request.args.get('uploaded_filename'))
     # uploaded_filename = str(uploaded_images[-1])
+    if uploaded_filename not in headcounts:
+        list_of_files = glob.glob('./uploads/*')
+        uploaded_filename = max(list_of_files, key=os.path.getctime)
     print(headcounts[uploaded_filename])
     return jsonify({'count':headcounts[uploaded_filename][0], 'density':headcounts[uploaded_filename][1]})
-
 def heatmap(den, base_img_path, n, save_path):
     print('generating heatmap for ' + base_img_path)
     
