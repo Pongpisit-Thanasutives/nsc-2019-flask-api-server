@@ -162,7 +162,7 @@ def getHeadcounts():
     uploaded_filename = str(request.args.get('uploaded_filename'))
     # uploaded_filename = str(uploaded_images[-1])
     if uploaded_filename not in headcounts:
-        list_of_files = glob.glob('./uploads/*')
+        list_of_files = [e for e in glob.glob('./uploads/*') if os.path.isfile(e)]
         uploaded_filename = max(list_of_files, key=os.path.getctime)
     print(headcounts[uploaded_filename])
     return jsonify({'count':headcounts[uploaded_filename][0], 'density':headcounts[uploaded_filename][1]})
