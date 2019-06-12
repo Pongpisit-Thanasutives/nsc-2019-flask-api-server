@@ -22,7 +22,9 @@ import scipy
 import json
 
 from keras.models import model_from_json
-from keras_applications.resnet import preprocess_input as k_preprocess_input
+# from keras_applications.resnet import preprocess_input as k_preprocess_input
+from utils_processing import norm_by_imagenet as k_preprocess_input
+from wnet import wnet
 from keras.preprocessing import image as k_image
 
 app = Flask(__name__)
@@ -64,7 +66,8 @@ preds = np.array(sorted(list(imgname2pred.values()))).reshape(len(imgname2pred),
 kmeans = KMeans(n_clusters=3,random_state=0).fit(preds)
 to_class = ['Medium', 'High', 'Low']
 
-model = load_model('models/Res50.json', 'weights/Res50.h5')
+model = wnet((None, None, 3))
+model.load_weights("wnet_icanteen.h5")
 model._make_predict_function()
 
 # Set up directories for uploading
@@ -140,6 +143,7 @@ def uploadImage():
         year, month, day, hour, minute = time.strftime("%Y,%m,%d,%H,%M", time.localtime(int(future))).split(',')
         filename = concatTime(hour, 7) + str(minute) + ".jpg"
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        print('Save ' + filename)
         base_img_path = UPLOAD_FOLDER + '/' + filename
 
         ### Model ###
@@ -153,7 +157,7 @@ def uploadImage():
         
         print(headcounts)
         
-        heatmap(pred, base_img_path, 8, UPLOAD_FOLDER + '/heatmap/' + filename)
+        heatmap(pred, base_img_path, 2, UPLOAD_FOLDER + '/heatmap/' + filename)
         return send_file(UPLOAD_FOLDER + '/heatmap/'  + filename)
 
 @app.route("/getHeadcounts", methods=['GET'])
@@ -162,7 +166,7 @@ def getHeadcounts():
     uploaded_filename = str(request.args.get('uploaded_filename'))
     # uploaded_filename = str(uploaded_images[-1])
     if uploaded_filename not in headcounts:
-        list_of_files = [e for e in glob.glob('./uploads/*') if os.path.isfile(e)]
+        list_of_files = [e for e in glob.glob('./uploads/*') if os.path.isfile(e) and '.jpg' in e]
         uploaded_filename = max(list_of_files, key=os.path.getctime)
     print(headcounts[uploaded_filename])
     return jsonify({'count':headcounts[uploaded_filename][0], 'density':headcounts[uploaded_filename][1]})
